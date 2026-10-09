@@ -1,5 +1,5 @@
-import { Trade, OHLCV } from './types';
-import { OrderBookManager } from './orderBook';
+import type { Trade, OHLCV, OrderBookDelta } from './types.js';
+import { OrderBookManager } from './orderBook.js';
 
 export class MarketEngine {
     private currentPrice: number = 50000.00;
@@ -14,11 +14,19 @@ export class MarketEngine {
     public activeCandle5s: OHLCV | null = null;
     
     public onTrade?: (trade: Trade) => void;
-    public onOrderBookDelta?: (delta: any) => void;
+    public onOrderBookDelta?: (delta: OrderBookDelta) => void;
     public onCandleUpdate?: (interval: string, candle: OHLCV) => void;
 
-    constructor() {
-        this.orderBook = new OrderBookManager();
+    private readonly random: () => number;
+
+    constructor(seed = Number(process.env.MARKET_SEED ?? 1337)) {
+        let state = Number.isFinite(seed) ? seed >>> 0 : 1337;
+        this.random = () => {
+            state = (1664525 * state + 1013904223) >>> 0;
+            return state / 4294967296;
+        };
+        this.orderBook = new OrderBookManager(this.random);
+        this.orderBook.seedLevels(this.currentPrice);
         this.orderBook.updateBookAroundPrice(this.currentPrice);
         
         this.generateHistory(5 * 60 * 1000);
@@ -58,11 +66,11 @@ export class MarketEngine {
     }
 
     private createRandomCandle(ts: number, open: number): OHLCV {
-        const movement = (Math.random() - 0.5) * 20;
+        const movement = (this.random() - 0.5) * 20;
         const close = open + movement;
-        const high = Math.max(open, close) + Math.random() * 5;
-        const low = Math.min(open, close) - Math.random() * 5;
-        const volume = Math.random() * 10 + 0.1;
+        const high = Math.max(open, close) + this.random() * 5;
+        const low = Math.min(open, close) - this.random() * 5;
+        const volume = this.random() * 10 + 0.1;
         
         return {
             timestamp: ts,
@@ -75,19 +83,19 @@ export class MarketEngine {
     }
 
     private tick() {
-        const priceChange = (Math.random() - 0.5) * 10;
+        const priceChange = (this.random() - 0.5) * 10;
         this.currentPrice = parseFloat((this.currentPrice + priceChange).toFixed(2));
         this.lastTradeId++;
         const trade: Trade = {
             id: this.lastTradeId,
             timestamp: Date.now(),
             price: this.currentPrice,
-            quantity: parseFloat((Math.random() * 0.5 + 0.01).toFixed(4))
+            quantity: parseFloat((this.random() * 0.5 + 0.01).toFixed(4))
         };
 
         if (this.onTrade) this.onTrade(trade);
 
-        if (Math.random() > 0.5) {
+        if (this.random() > 0.5) {
             const delta = this.orderBook.updateBookAroundPrice(this.currentPrice);
             if (this.onOrderBookDelta) {
                 this.onOrderBookDelta(delta);

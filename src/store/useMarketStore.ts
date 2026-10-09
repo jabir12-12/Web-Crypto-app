@@ -14,6 +14,32 @@ export interface OrderBookEntry {
   quantity: number;
 }
 
+export interface OrderBook {
+  bids: OrderBookEntry[];
+  asks: OrderBookEntry[];
+  lastUpdateId: number;
+}
+
+export interface OrderBookDelta {
+  bids: OrderBookEntry[];
+  asks: OrderBookEntry[];
+  updateId: number;
+}
+
+export interface ChartCandle {
+  time: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+}
+
+const normalizeOrderBook = (snapshot: OrderBook): OrderBook => ({
+  bids: [...snapshot.bids].sort((a, b) => b.price - a.price).slice(0, 20),
+  asks: [...snapshot.asks].sort((a, b) => a.price - b.price).slice(0, 20),
+  lastUpdateId: snapshot.lastUpdateId,
+});
+
 export interface Trade {
   id: number;
   timestamp: number;
@@ -31,7 +57,7 @@ interface MarketState {
   updateRate: number;
   
   // Market Data
-  orderBook: { bids: OrderBookEntry[], asks: OrderBookEntry[], lastUpdateId: number };
+  orderBook: OrderBook;
   trades: Trade[];
   activeCandle1s: OHLCV | null;
   activeCandle5s: OHLCV | null;
@@ -42,8 +68,8 @@ interface MarketState {
   setTier: (tier: string) => void;
   setNetworkStats: (rtt: number, jitter: number) => void;
   setUpdateRate: (rate: number) => void;
-  setOrderBookSnapshot: (snapshot: any) => void;
-  applyOrderBookDelta: (delta: any) => void;
+  setOrderBookSnapshot: (snapshot: OrderBook) => void;
+  applyOrderBookDelta: (delta: OrderBookDelta) => boolean;
   addTrade: (trade: Trade) => void;
   updateActiveCandles: (candle1s: OHLCV | null, candle5s: OHLCV | null) => void;
 }
@@ -67,12 +93,16 @@ export const useMarketStore = create<MarketState>((set) => ({
   setNetworkStats: (rtt, jitter) => set({ rtt, jitter }),
   setUpdateRate: (rate) => set({ updateRate: rate }),
   
-  setOrderBookSnapshot: (snapshot) => set({ orderBook: snapshot }),
-  applyOrderBookDelta: (delta) => set((state) => {
+  setOrderBookSnapshot: (snapshot) => set((state) => (
+    snapshot.lastUpdateId >= state.orderBook.lastUpdateId
+      ? { orderBook: normalizeOrderBook(snapshot) }
+      : state
+  )),
+  applyOrderBookDelta: (delta) => {
+    let applied = false;
+    set((state) => {
     if (delta.updateId !== state.orderBook.lastUpdateId + 1) {
-      // Out of order! This should trigger a snapshot reload in the WS manager, 
-      // but for state update we just ignore it if it's too old or out of sync.
-      return {}; 
+      return state;
     }
 
     const newBids = [...state.orderBook.bids];
@@ -104,6 +134,7 @@ export const useMarketStore = create<MarketState>((set) => ({
     newBids.sort((a, b) => b.price - a.price);
     newAsks.sort((a, b) => a.price - b.price);
     
+    applied = true;
     return {
       orderBook: {
         bids: newBids.slice(0, 20),
@@ -111,7 +142,9 @@ export const useMarketStore = create<MarketState>((set) => ({
         lastUpdateId: delta.updateId
       }
     };
-  }),
+    });
+    return applied;
+  },
   
   addTrade: (trade) => set((state) => ({
     trades: [trade, ...state.trades].slice(0, 50)

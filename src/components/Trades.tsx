@@ -5,8 +5,8 @@ export default function Trades() {
   const { trades } = useMarketStore();
 
   return (
-    <div className="flex flex-col h-full bg-[#131722]">
-      <div className="flex justify-between text-[10px] text-gray-500 border-b border-[#2a2e39] pb-1 mb-1 px-3">
+    <div className="flex h-full flex-col bg-transparent">
+      <div className="eyebrow flex justify-between px-5 pb-2 pt-3">
         <span className="w-1/3 text-left">TIME</span>
         <span className="w-1/3 text-center">PRICE</span>
         <span className="w-1/3 text-right">AMOUNT</span>
@@ -23,7 +23,7 @@ export default function Trades() {
             : 'text-gray-300';
             
           return (
-            <div key={t.id} className="flex justify-between text-xs py-[2px] font-mono hover:bg-[#2a2e39]/50 transition-colors cursor-default">
+            <div key={t.id} className="data-row flex justify-between px-2 py-1 text-xs font-mono cursor-default">
               <span className="text-gray-500 w-1/3 text-left">{timeStr}</span>
               <span className={`${colorClass} w-1/3 text-center`}>{t.price.toFixed(2)}</span>
               <span className="text-gray-300 w-1/3 text-right">{t.quantity.toFixed(4)}</span>

@@ -61,16 +61,13 @@ export default function Home() {
   const fetchSnapshotRef = useRef<() => void>(() => undefined);
   const snapshotInFlightRef = useRef(false);
   const pendingDeltasRef = useRef<OrderBookDelta[]>([]);
-
-  const {
+  
+  const { 
     isConnected,
     isStale,
-    rtt,
-    jitter,
-    updateRate,
-    setConnectionStatus,
-    setStale,
-    setTier,
+    setConnectionStatus, 
+    setStale, 
+    setTier, 
     setNetworkStats,
     setUpdateRate,
     setOrderBookSnapshot,
@@ -79,7 +76,7 @@ export default function Home() {
     updateActiveCandles,
     trades
   } = useMarketStore();
-
+  
   const [intervalSelection, setIntervalSelection] = useState<'1s' | '5s'>('1s');
   const [initialHistoryLoaded, setInitialHistoryLoaded] = useState(false);
   const [chartHistory, setChartHistory] = useState<ChartCandle[]>([]);
@@ -88,7 +85,7 @@ export default function Home() {
   // Latency tracking
   const pings = useRef<{ [key: number]: number }>({});
   const rttHistory = useRef<number[]>([]);
-
+  
   const fetchOrderBookSnapshot = useCallback(async () => {
     if (snapshotInFlightRef.current) return;
     snapshotInFlightRef.current = true;
@@ -139,7 +136,7 @@ export default function Home() {
         low: d.low,
         close: d.close,
       }));
-
+      
       // Ensure strictly ascending order and remove duplicates
       formatted.sort((a, b) => a.time - b.time);
       formatted = formatted.filter((item, index, arr) => {
@@ -157,7 +154,7 @@ export default function Home() {
   const connectWs = useCallback(() => {
     if (!mountedRef.current) return;
     if (wsRef.current) wsRef.current.close();
-
+    
     const ws = new WebSocket(WS_URL);
     wsRef.current = ws;
     setDebugSocket(ws);
@@ -167,7 +164,7 @@ export default function Home() {
       setStale(false);
       pendingDeltasRef.current = [];
       void fetchOrderBookSnapshot();
-
+      
       pingInterval.current = setInterval(() => {
         if (ws.readyState === WebSocket.OPEN && !document.hidden) {
           const ts = Date.now();
@@ -193,22 +190,22 @@ export default function Home() {
         if (sentAt) {
           const rtt = now - sentAt;
           delete pings.current[msg.timestamp];
-
+          
           rttHistory.current.push(rtt);
           if (rttHistory.current.length > 5) rttHistory.current.shift();
-
+          
           let jitter = 0;
           if (rttHistory.current.length > 1) {
             let sumDiff = 0;
             for (let i = 1; i < rttHistory.current.length; i++) {
-              sumDiff += Math.abs(rttHistory.current[i] - rttHistory.current[i - 1]);
+              sumDiff += Math.abs(rttHistory.current[i] - rttHistory.current[i-1]);
             }
             jitter = Math.round(sumDiff / (rttHistory.current.length - 1));
           }
-
-          const avgRtt = Math.round(rttHistory.current.reduce((a, b) => a + b, 0) / rttHistory.current.length);
+          
+          const avgRtt = Math.round(rttHistory.current.reduce((a,b)=>a+b,0)/rttHistory.current.length);
           setNetworkStats(avgRtt, jitter);
-
+          
           ws.send(JSON.stringify({ type: 'report', rtt: avgRtt, jitter }));
         }
       } else if (
@@ -228,8 +225,8 @@ export default function Home() {
           return;
         }
         if (msg.data.updateId > currentStoreId + 1) {
-          pendingDeltasRef.current.push(msg.data);
-          void fetchOrderBookSnapshot();
+           pendingDeltasRef.current.push(msg.data);
+           void fetchOrderBookSnapshot();
         } else if (msg.data.updateId === currentStoreId + 1) {
           applyOrderBookDelta(msg.data);
         }
@@ -283,7 +280,7 @@ export default function Home() {
   useEffect(() => {
     mountedRef.current = true;
     connectWs();
-
+    
     const handleVisibility = () => {
       if (document.hidden) {
         setStale(true);
@@ -308,8 +305,8 @@ export default function Home() {
   const latestPrice = trades.length > 0 ? trades[0].price : null;
   const previousPrice = trades.length > 1 ? trades[1].price : latestPrice;
   const priceDelta = latestPrice && previousPrice ? latestPrice - previousPrice : null;
-  const priceColor = latestPrice && previousPrice && latestPrice > previousPrice ? 'text-[#26a69a]' :
-    latestPrice && previousPrice && latestPrice < previousPrice ? 'text-[#ef5350]' : 'text-gray-100';
+  const priceColor = latestPrice && previousPrice && latestPrice > previousPrice ? 'text-[#26a69a]' : 
+                     latestPrice && previousPrice && latestPrice < previousPrice ? 'text-[#ef5350]' : 'text-gray-100';
 
   return (
     <main className="flex h-screen flex-col overflow-hidden select-none bg-[#080a0f] text-gray-300">
@@ -356,21 +353,21 @@ export default function Home() {
       )}
 
       <div className="flex-1 overflow-y-auto p-2 md:overflow-hidden">
-        <div className="grid min-h-275 h-full grid-cols-1 gap-3 md:min-h-0 md:grid-cols-12 md:grid-rows-[minmax(0,1.65fr)_minmax(0,1fr)]">
-
-          <div className="panel relative flex min-h-100 flex-col overflow-hidden rounded-xl md:col-span-7 md:row-span-1 md:min-h-0">
+        <div className="grid min-h-[1100px] h-full grid-cols-1 gap-3 md:min-h-0 md:grid-cols-12 md:grid-rows-[minmax(0,1.65fr)_minmax(0,1fr)]">
+          
+          <div className="panel relative flex min-h-[400px] flex-col overflow-hidden rounded-xl md:col-span-7 md:row-span-1 md:min-h-0">
             <div className="panel-header flex items-center justify-between px-4 py-3">
               <div>
                 <div className="text-sm font-semibold text-gray-100">Candlestick Chart</div>
               </div>
               <div className="flex gap-1 rounded-lg border border-white/10 bg-black/20 p-1">
-                <button
+                <button 
                   onClick={() => setIntervalSelection('1s')}
                   className={`rounded-md px-3 py-1.5 text-[10px] font-bold transition-colors ${intervalSelection === '1s' ? 'bg-sky-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}
                 >
                   1s
                 </button>
-                <button
+                <button 
                   onClick={() => setIntervalSelection('5s')}
                   className={`rounded-md px-3 py-1.5 text-[10px] font-bold transition-colors ${intervalSelection === '5s' ? 'bg-sky-500 text-white' : 'text-gray-400 hover:text-gray-200'}`}
                 >
@@ -392,8 +389,8 @@ export default function Home() {
               )}
             </div>
           </div>
-
-          <div className="panel flex min-h-125 flex-col overflow-hidden rounded-xl md:col-span-5 md:row-start-1 md:min-h-0">
+          
+          <div className="panel flex min-h-[500px] flex-col overflow-hidden rounded-xl md:col-span-5 md:row-start-1 md:min-h-0">
             <div className="panel-header flex items-center justify-between px-4 py-3">
               <div>
                 <div className="text-sm font-semibold text-gray-100">Order Book (Top 10)</div>
@@ -405,7 +402,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="panel flex min-h-55 flex-col overflow-hidden rounded-xl md:col-span-6 md:row-start-2 md:min-h-0">
+          <div className="panel flex min-h-[220px] flex-col overflow-hidden rounded-xl md:col-span-6 md:row-start-2 md:min-h-0">
             <div className="panel-header px-4 py-3">
               <div className="text-sm font-semibold text-gray-100">Recent Trades</div>
             </div>
@@ -414,7 +411,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="panel flex min-h-55 flex-col overflow-hidden rounded-xl md:col-span-6 md:col-start-7 md:row-start-2 md:min-h-0">
+          <div className="panel flex min-h-[220px] flex-col overflow-hidden rounded-xl md:col-span-6 md:col-start-7 md:row-start-2 md:min-h-0">
             <div className="panel-header flex items-center justify-between px-4 py-3">
               <div>
                 <div className="text-sm font-semibold text-gray-100">Connection &amp; Delivery Details</div>
@@ -424,7 +421,7 @@ export default function Home() {
               <DebugPanel ws={debugSocket} />
             </div>
           </div>
-
+          
         </div>
       </div>
     </main>

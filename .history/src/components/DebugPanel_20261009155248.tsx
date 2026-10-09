@@ -16,7 +16,7 @@ export default function DebugPanel({ ws }: { ws: WebSocket | null }) {
 
   return (
     <div className="flex flex-col bg-transparent p-4 text-xs">
-
+      
       <div className="mb-4 grid grid-cols-2 gap-3 md:grid-cols-3">
         <div className="rounded-lg border border-white/10 bg-white/[0.025] p-3">
           <span className="eyebrow">Connection Status</span>
@@ -50,19 +50,19 @@ export default function DebugPanel({ ws }: { ws: WebSocket | null }) {
       </div>
 
       <div className="mt-auto border-t border-white/10 pt-3">
-        <button
+        <button 
           onClick={() => setShowDemoControls(!showDemoControls)}
           className="flex w-full items-center justify-between text-left text-[11px] font-semibold tracking-wide text-gray-400 outline-none transition-colors hover:text-gray-100"
         >
           <span>DEMO CONTROLS</span>
           <span>{showDemoControls ? '▼' : '▶'}</span>
         </button>
-
+        
         {showDemoControls && (
           <div className="mt-3 flex flex-col gap-2 rounded-lg border border-white/10 bg-black/20 p-3">
             <div className="flex justify-between items-center">
               <span className="text-gray-500 text-[10px] uppercase">Force Tier</span>
-              <select
+              <select 
                 value={forcedTier}
                 onChange={(e) => forceTier(e.target.value)}
                 className="w-28 rounded-md border border-white/10 bg-[#0b0e14] p-1.5 text-xs text-gray-200 outline-none"

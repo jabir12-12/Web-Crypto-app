@@ -7,7 +7,7 @@ export default function OrderBook() {
   const topAsks = orderBook.asks.slice(0, 10).reverse();
   const topBids = orderBook.bids.slice(0, 10);
 
-  const renderRow = (entry: { price: number, quantity: number }, type: 'bid' | 'ask') => (
+  const renderRow = (entry: {price: number, quantity: number}, type: 'bid'|'ask') => (
     <div key={entry.price} className="data-row flex justify-between px-2 py-1 text-xs font-mono cursor-default">
       <span className={type === 'bid' ? 'text-[#26a69a]' : 'text-[#ef5350]'}>{entry.price.toFixed(2)}</span>
       <span className="text-gray-300">{entry.quantity.toFixed(4)}</span>

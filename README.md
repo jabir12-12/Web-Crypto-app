@@ -1,46 +1,10 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Synthetic BTC/USD market dashboard
 
-## Getting Started
+This project is a self-contained synthetic BTC/USD market-data dashboard.
 
-First, run the development server:
+## Run locally
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
-```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
-
-## Backend
-
-The `backend/` directory contains the Node.js, Express, and WebSocket server
-used by the dashboard.
-
-From the repository root, run:
+Start the backend in one terminal:
 
 ```bash
 cd backend
@@ -48,12 +12,55 @@ npm install
 npm run dev
 ```
 
-Run the frontend in a second terminal:
+Start the frontend in a second terminal from the repository root:
 
 ```bash
 npm install
 npm run dev
 ```
 
-The backend listens on `http://localhost:4000` and the frontend on
-`http://localhost:3000`.
+Open [http://localhost:3000](http://localhost:3000). The backend exposes REST
+at `http://localhost:4000/api` and WebSocket at `ws://localhost:4000`.
+
+For a deployment, set `NEXT_PUBLIC_API_URL` and `NEXT_PUBLIC_WS_URL` to the
+public backend HTTPS/WSS origins before building. They default to the local
+URLs above.
+
+## Market-data behavior
+
+The backend generates trades every 300 ms and maintains at least 10 bid and
+10 ask levels. `GET /api/orderbook` provides a snapshot with a monotonically
+increasing `lastUpdateId`; WebSocket `orderBook` messages provide ordered
+deltas. The client buffers deltas while a snapshot is in flight and requests a
+new snapshot after a sequence gap.
+
+`GET /api/history?interval=1s` and `interval=5s` provide OHLCV history.
+WebSocket `trade` messages provide recent trades and `chartUpdate` messages
+provide active candles. Set `MARKET_SEED` before starting the backend to make
+the generated sequence deterministic:
+
+```powershell
+$env:MARKET_SEED = "1337"
+npm run dev
+```
+
+## Adaptive chart delivery
+
+The client sends a ping every two seconds. RTT is the elapsed time between the
+ping timestamp and its pong. Jitter is the average absolute difference between
+the last five consecutive RTT samples. The backend averages those reports and
+owns the delivery tier for each connection.
+
+Automatic tier changes require three consecutive reports, providing
+hysteresis:
+
+- `FULL`: below 80 ms when upgrading; target 20 chart updates/sec.
+- `DEGRADED`: above 120 ms to downgrade from full and below 80 ms to upgrade
+  to full; target 2 updates/sec.
+- `MINIMAL`: above 320 ms to downgrade and below 240 ms to upgrade to
+  degraded; target 0.5 updates/sec.
+
+If no latency report arrives for 10 seconds, the connection moves to
+`MINIMAL`. A disconnected client is removed. The debug panel can force any
+tier or return to automatic mode, and displays the backend-selected effective
+rate.

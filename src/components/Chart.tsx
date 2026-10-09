@@ -1,11 +1,11 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-import { createChart, CandlestickSeries, IChartApi, ISeriesApi, CrosshairMode } from 'lightweight-charts';
-import { useMarketStore } from '../store/useMarketStore';
+import { createChart, CandlestickSeries, IChartApi, ISeriesApi, CrosshairMode, Time } from 'lightweight-charts';
+import { ChartCandle, useMarketStore } from '../store/useMarketStore';
 
 interface ChartProps {
   interval: '1s' | '5s';
-  history: any[];
+  history: ChartCandle[];
 }
 
 export default function Chart({ interval, history }: ChartProps) {
@@ -21,7 +21,7 @@ export default function Chart({ interval, history }: ChartProps) {
     close: number;
   } | null>(null);
 
-  const { activeCandle1s, activeCandle5s, isStale } = useMarketStore();
+  const { activeCandle1s, activeCandle5s } = useMarketStore();
   const activeCandle = interval === '1s' ? activeCandle1s : activeCandle5s;
 
   useEffect(() => {
@@ -71,7 +71,7 @@ export default function Chart({ interval, history }: ChartProps) {
       wickDownColor: '#ef5350',
     });
 
-    series.setData(history);
+    series.setData(history.map((candle) => ({ ...candle, time: candle.time as Time })));
     
     chartRef.current = chart;
     seriesRef.current = series;
@@ -87,8 +87,8 @@ export default function Chart({ interval, history }: ChartProps) {
       ) {
         setHoverInfo(null);
       } else {
-        const data = param.seriesData.get(series) as any;
-        if (data) {
+        const data = param.seriesData.get(series);
+        if (data && 'open' in data && 'high' in data && 'low' in data && 'close' in data) {
           const date = new Date((param.time as number) * 1000);
           setHoverInfo({
             time: date.toLocaleTimeString([], { hour12: false }),
@@ -98,6 +98,20 @@ export default function Chart({ interval, history }: ChartProps) {
             close: data.close,
           });
         }
+      }
+    });
+
+    chart.subscribeClick((param) => {
+      const data = param.seriesData.get(series);
+      if (param.time && data && 'open' in data && 'high' in data && 'low' in data && 'close' in data) {
+        const date = new Date((param.time as number) * 1000);
+        setHoverInfo({
+          time: date.toLocaleTimeString([], { hour12: false }),
+          open: data.open,
+          high: data.high,
+          low: data.low,
+          close: data.close,
+        });
       }
     });
 
@@ -121,7 +135,7 @@ export default function Chart({ interval, history }: ChartProps) {
   useEffect(() => {
     if (seriesRef.current && activeCandle) {
       seriesRef.current.update({
-        time: Math.floor(activeCandle.timestamp / 1000) as any,
+      time: Math.floor(activeCandle.timestamp / 1000) as Time,
         open: activeCandle.open,
         high: activeCandle.high,
         low: activeCandle.low,

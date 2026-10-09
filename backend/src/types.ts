@@ -16,6 +16,12 @@ export interface OrderBook {
   lastUpdateId: number;
 }
 
+export interface OrderBookDelta {
+  bids: OrderBookEntry[];
+  asks: OrderBookEntry[];
+  updateId: number;
+}
+
 export interface OHLCV {
   timestamp: number;
   open: number;

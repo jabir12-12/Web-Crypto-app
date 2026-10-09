@@ -3,6 +3,7 @@ import http from 'http';
 import { WebSocketServer, WebSocket } from 'ws';
 import cors from 'cors';
 import { MarketEngine } from './marketEngine.js';
+import { Tier, TierController, THROTTLE_RATES, tierName, tierRate } from './tierController.js';
 
 const app = express();
 app.use(cors());
@@ -24,16 +25,10 @@ app.get('/api/history', (req, res) => {
     else res.status(400).json({ error: 'Invalid interval' });
 });
 
-enum Tier { FULL, DEGRADED, MINIMAL }
-
 interface ClientState {
     ws: WebSocket;
-    tier: Tier;
-    forceTier: Tier | null;
-    rttHistory: number[];
+    tierController: TierController;
     lastChartEmitTime: number;
-    lastReportAt: number;
-    tierChangeVotes: number;
 }
 
 const clients = new Set<ClientState>();
@@ -44,40 +39,12 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 const isFiniteNumber = (value: unknown): value is number =>
     typeof value === 'number' && Number.isFinite(value);
 
-const TIER_THRESHOLDS = {
-    DOWNGRADE_DEGRADED: 120,
-    DOWNGRADE_MINIMAL: 320,
-    UPGRADE_FULL: 80,
-    UPGRADE_DEGRADED: 240,
-};
-
-const THROTTLE_RATES = {
-    [Tier.FULL]: 0,
-    [Tier.DEGRADED]: 500, 
-    [Tier.MINIMAL]: 2000, 
-};
-
-const REPORT_TIMEOUT_MS = 10000;
-const REQUIRED_TIER_VOTES = 3;
-
-function tierName(tier: Tier): string {
-    return tier === Tier.FULL ? 'FULL' : tier === Tier.DEGRADED ? 'DEGRADED' : 'MINIMAL';
-}
-
-function tierRate(tier: Tier): number {
-    return tier === Tier.FULL ? 20 : tier === Tier.DEGRADED ? 2 : 0.5;
-}
-
 wss.on('connection', (ws) => {
-    const state: ClientState = {
+    const state = {
         ws,
-        tier: Tier.FULL,
-        forceTier: null,
-        rttHistory: [],
+        tierController: new TierController(Date.now(), () => sendTierUpdate(state)),
         lastChartEmitTime: 0,
-        lastReportAt: Date.now(),
-        tierChangeVotes: 0
-    };
+    } as ClientState;
     clients.add(state);
     sendTierUpdate(state);
 
@@ -91,13 +58,13 @@ wss.on('connection', (ws) => {
             if (data.type === 'ping' && isFiniteNumber(data.timestamp)) {
                 ws.send(JSON.stringify({ type: 'pong', timestamp: data.timestamp, serverTime: Date.now() }));
             } else if (data.type === 'report' && isFiniteNumber(data.rtt)) {
-                updateTier(state, data.rtt);
+                state.tierController.report(data.rtt);
             } else if (data.type === 'forceTier') {
-                if (data.tier === 'FULL') state.forceTier = Tier.FULL;
-                else if (data.tier === 'DEGRADED') state.forceTier = Tier.DEGRADED;
-                else if (data.tier === 'MINIMAL') state.forceTier = Tier.MINIMAL;
-                else state.forceTier = null;
-                updateTier(state, state.rttHistory[state.rttHistory.length - 1] || 0);
+                const forcedTier = data.tier === 'FULL' ? Tier.FULL
+                    : data.tier === 'DEGRADED' ? Tier.DEGRADED
+                        : data.tier === 'MINIMAL' ? Tier.MINIMAL : null;
+                state.tierController.force(forcedTier);
+                if (forcedTier === null) state.tierController.report(0);
             } else {
                 console.error(`Ignoring unsupported WebSocket message type: ${data.type}`);
             }
@@ -111,48 +78,13 @@ wss.on('connection', (ws) => {
     });
 });
 
-function updateTier(state: ClientState, rtt: number) {
-    state.lastReportAt = Date.now();
-    if (rtt != null) {
-        state.rttHistory.push(rtt);
-        if (state.rttHistory.length > 5) state.rttHistory.shift();
-    }
-    
-    if (state.forceTier !== null) {
-        if (state.tier !== state.forceTier) {
-            state.tier = state.forceTier;
-            sendTierUpdate(state);
-        }
-        return;
-    }
-
-    const avgRtt = state.rttHistory.length > 0
-        ? state.rttHistory.reduce((a, b) => a + b, 0) / state.rttHistory.length
-        : 0;
-    let desiredTier = state.tier;
-    if (state.tier === Tier.FULL && avgRtt > TIER_THRESHOLDS.DOWNGRADE_MINIMAL) desiredTier = Tier.MINIMAL;
-    else if (state.tier !== Tier.MINIMAL && avgRtt > TIER_THRESHOLDS.DOWNGRADE_DEGRADED) desiredTier = Tier.DEGRADED;
-    else if (state.tier === Tier.MINIMAL && avgRtt < TIER_THRESHOLDS.UPGRADE_DEGRADED) desiredTier = Tier.DEGRADED;
-    else if (state.tier === Tier.DEGRADED && avgRtt < TIER_THRESHOLDS.UPGRADE_FULL) desiredTier = Tier.FULL;
-
-    if (desiredTier === state.tier) {
-        state.tierChangeVotes = 0;
-    } else {
-        state.tierChangeVotes++;
-        if (state.tierChangeVotes >= REQUIRED_TIER_VOTES) {
-            state.tier = desiredTier;
-            state.tierChangeVotes = 0;
-            sendTierUpdate(state);
-        }
-    }
-}
-
 function sendTierUpdate(state: ClientState) {
+    const tier = state.tierController.tier;
     state.ws.send(JSON.stringify({
         type: 'tierUpdate',
-        tier: tierName(state.tier),
-        throttleMs: THROTTLE_RATES[state.tier],
-        updatesPerSecond: tierRate(state.tier)
+        tier: tierName(tier),
+        throttleMs: THROTTLE_RATES[tier],
+        updatesPerSecond: tierRate(tier)
     }));
 }
 
@@ -180,12 +112,8 @@ engine.onTrade = (trade) => {
 setInterval(() => {
     const now = Date.now();
     clients.forEach(state => {
-        if (state.forceTier === null && now - state.lastReportAt > REPORT_TIMEOUT_MS && state.tier !== Tier.MINIMAL) {
-            state.tier = Tier.MINIMAL;
-            state.tierChangeVotes = 0;
-            sendTierUpdate(state);
-        }
-        const activeTier = state.forceTier !== null ? state.forceTier : state.tier;
+        state.tierController.checkReportTimeout(now);
+        const activeTier = state.tierController.forceTier ?? state.tierController.tier;
         const throttleMs = THROTTLE_RATES[activeTier];
         
         if (now - state.lastChartEmitTime >= throttleMs) {

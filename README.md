@@ -88,7 +88,7 @@ The backend is responsible for:
 
 ```mermaid
 flowchart LR
-    Browser[Next.js Frontend] -->|GET /api/orderbook| API[Express REST API]
+    Browser[Next.js Frontend] -->|GET /api/orderbook| API[Express REST API] 
     Browser -->|GET /api/history?interval=1s or 5s| API
 
     Browser <-->|WebSocket over wss://| WS[WebSocket Server]

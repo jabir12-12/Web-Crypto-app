@@ -204,6 +204,8 @@ setInterval(() => {
     });
 }, 50);
 
-server.listen(4000, () => {
-    console.log('Backend listening on port 4000');
+const port = Number(process.env.PORT ?? 4000);
+
+server.listen(port, () => {
+    console.log(`Backend listening on port ${port}`);
 });

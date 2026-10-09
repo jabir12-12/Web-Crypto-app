@@ -4,7 +4,7 @@ import { ChartCandle, OHLCV, OrderBook as MarketOrderBook, OrderBookDelta, Order
 import Chart from '../components/Chart';
 import OrderBook from '../components/OrderBook';
 import Trades from '../components/Trades';
-import DebugPanel, { DeliveryTierControl } from '../components/DebugPanel';
+import DebugPanel from '../components/DebugPanel';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:4000';
@@ -313,7 +313,7 @@ export default function Home() {
 
   return (
     <main className="flex h-screen flex-col overflow-hidden select-none bg-[#080a0f] text-gray-300">
-      <header className="grid shrink-0 grid-cols-1 gap-3 border-b border-white/10 bg-[#0d1119]/90 px-4 py-3 backdrop-blur-xl sm:grid-cols-[1.25fr_0.8fr_1.95fr] sm:items-center sm:px-6">
+      <header className="grid shrink-0 grid-cols-1 gap-3 border-b border-white/10 bg-[#0d1119]/90 px-4 py-3 backdrop-blur-xl sm:grid-cols-[1.35fr_1fr_1.45fr] sm:items-center sm:px-6">
         <div className="flex items-center gap-4">
           <div className="border-r border-white/10 pr-4">
             <h1 className="m-0 text-xl font-bold leading-none tracking-tight text-gray-100">BTC / USD</h1>
@@ -337,13 +337,10 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="flex items-center justify-end gap-3">
-          <div className="grid grid-cols-3 gap-3 text-right">
-            <div><span className="eyebrow block">Latency</span><span className="font-mono text-xs text-gray-200">{rtt} ms</span></div>
-            <div><span className="eyebrow block">Jitter</span><span className="font-mono text-xs text-gray-200">{jitter} ms</span></div>
-            <div><span className="eyebrow block">Update Rate</span><span className="font-mono text-xs text-gray-200">{updateRate} / sec</span></div>
-          </div>
-          <DeliveryTierControl ws={debugSocket} />
+        <div className="grid grid-cols-3 gap-4 text-right">
+          <div><span className="eyebrow block">Latency</span><span className="font-mono text-xs text-gray-200">{rtt} ms</span></div>
+          <div><span className="eyebrow block">Jitter</span><span className="font-mono text-xs text-gray-200">{jitter} ms</span></div>
+          <div><span className="eyebrow block">Update Rate</span><span className="font-mono text-xs text-gray-200">{updateRate} / sec</span></div>
         </div>
       </header>
 
@@ -424,7 +421,7 @@ export default function Home() {
               </div>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <DebugPanel />
+              <DebugPanel ws={debugSocket} />
             </div>
           </div>
 

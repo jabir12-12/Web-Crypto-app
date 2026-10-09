@@ -31,10 +31,7 @@ export function DeliveryTierControl({ ws }: { ws: WebSocket | null }) {
 }
 
 export default function DebugPanel() {
-  const { isConnected, isStale, tier, lastOrderBookUpdateAt } = useMarketStore();
-  const lastUpdate = lastOrderBookUpdateAt
-    ? new Date(lastOrderBookUpdateAt).toLocaleTimeString([], { hour12: false })
-    : '---';
+  const { isConnected, isStale, tier, orderBook } = useMarketStore();
 
   return (
     <div className="flex flex-col gap-3 bg-transparent p-3 text-xs">
@@ -54,7 +51,7 @@ export default function DebugPanel() {
         </div>
         <div className="rounded-lg border border-white/10 bg-white/2.5 p-3 shadow-inner shadow-white/2">
           <span className="eyebrow">Last Update</span>
-          <span className="mt-2 block font-mono text-lg text-gray-400">{lastUpdate}</span>
+          <span className="mt-2 block font-mono text-lg text-gray-400">{orderBook.lastUpdateId || '---'}</span>
         </div>
       </div>
     </div>

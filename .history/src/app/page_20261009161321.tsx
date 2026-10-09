@@ -4,7 +4,6 @@ import { ChartCandle, OHLCV, OrderBook as MarketOrderBook, OrderBookDelta, Order
 import Chart from '../components/Chart';
 import OrderBook from '../components/OrderBook';
 import Trades from '../components/Trades';
-import DebugPanel, { DeliveryTierControl } from '../components/DebugPanel';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 const WS_URL = process.env.NEXT_PUBLIC_WS_URL ?? 'ws://localhost:4000';
@@ -84,10 +83,19 @@ export default function Home() {
   const [initialHistoryLoaded, setInitialHistoryLoaded] = useState(false);
   const [chartHistory, setChartHistory] = useState<ChartCandle[]>([]);
   const [debugSocket, setDebugSocket] = useState<WebSocket | null>(null);
+  const [showDeliveryControl, setShowDeliveryControl] = useState(false);
+  const [forcedTier, setForcedTier] = useState('AUTO');
 
   // Latency tracking
   const pings = useRef<{ [key: number]: number }>({});
   const rttHistory = useRef<number[]>([]);
+
+  const forceTier = (tierSelection: string) => {
+    setForcedTier(tierSelection);
+    if (debugSocket && debugSocket.readyState === WebSocket.OPEN) {
+      debugSocket.send(JSON.stringify({ type: 'forceTier', tier: tierSelection === 'AUTO' ? null : tierSelection }));
+    }
+  };
 
   const fetchOrderBookSnapshot = useCallback(async () => {
     if (snapshotInFlightRef.current) return;
@@ -313,7 +321,7 @@ export default function Home() {
 
   return (
     <main className="flex h-screen flex-col overflow-hidden select-none bg-[#080a0f] text-gray-300">
-      <header className="grid shrink-0 grid-cols-1 gap-3 border-b border-white/10 bg-[#0d1119]/90 px-4 py-3 backdrop-blur-xl sm:grid-cols-[1.25fr_0.8fr_1.95fr] sm:items-center sm:px-6">
+      <header className="grid shrink-0 grid-cols-1 gap-3 border-b border-white/10 bg-[#0d1119]/90 px-4 py-3 backdrop-blur-xl sm:grid-cols-[1.35fr_1fr_1.45fr] sm:items-center sm:px-6">
         <div className="flex items-center gap-4">
           <div className="border-r border-white/10 pr-4">
             <h1 className="m-0 text-xl font-bold leading-none tracking-tight text-gray-100">BTC / USD</h1>
@@ -338,12 +346,35 @@ export default function Home() {
         </div>
 
         <div className="flex items-center justify-end gap-3">
-          <div className="grid grid-cols-3 gap-3 text-right">
+          <div className="grid grid-cols-3 gap-4 text-right">
             <div><span className="eyebrow block">Latency</span><span className="font-mono text-xs text-gray-200">{rtt} ms</span></div>
             <div><span className="eyebrow block">Jitter</span><span className="font-mono text-xs text-gray-200">{jitter} ms</span></div>
             <div><span className="eyebrow block">Update Rate</span><span className="font-mono text-xs text-gray-200">{updateRate} / sec</span></div>
           </div>
-          <DeliveryTierControl ws={debugSocket} />
+          <div className="relative shrink-0">
+            <button
+              onClick={() => setShowDeliveryControl(!showDeliveryControl)}
+              className="rounded-md border border-white/10 bg-white/[0.04] px-2 py-2 text-[10px] font-semibold text-gray-300 transition-colors hover:bg-white/[0.08]"
+            >
+              Delivery {showDeliveryControl ? '−' : '+'}
+            </button>
+            {showDeliveryControl && (
+              <div className="absolute right-0 top-full z-20 mt-2 w-56 rounded-lg border border-white/10 bg-[#10141d] p-3 text-left shadow-2xl shadow-black/50">
+                <span className="block text-[10px] font-semibold uppercase tracking-wider text-gray-300">Delivery mode</span>
+                <span className="mt-1 block text-[10px] text-gray-500">Override adaptive updates</span>
+                <select
+                  value={forcedTier}
+                  onChange={(event) => forceTier(event.target.value)}
+                  className="mt-3 w-full rounded-md border border-white/10 bg-[#0b0e14] px-2 py-2 text-xs font-semibold text-gray-200 outline-none"
+                >
+                  <option value="AUTO">Auto</option>
+                  <option value="FULL">Full</option>
+                  <option value="DEGRADED">Degraded</option>
+                  <option value="MINIMAL">Minimal</option>
+                </select>
+              </div>
+            )}
+          </div>
         </div>
       </header>
 
@@ -359,9 +390,9 @@ export default function Home() {
       )}
 
       <div className="flex-1 overflow-y-auto p-2 md:overflow-hidden">
-        <div className="grid min-h-275 h-full grid-cols-1 gap-3 md:min-h-0 md:grid-cols-12 md:grid-rows-[minmax(0,1.65fr)_minmax(0,1fr)]">
+        <div className="grid min-h-275 h-full grid-cols-1 gap-3 md:min-h-0 md:grid-cols-12 md:grid-rows-[minmax(0,1.6fr)_minmax(0,1fr)]">
 
-          <div className="panel relative flex min-h-100 flex-col overflow-hidden rounded-xl md:col-span-7 md:row-span-1 md:min-h-0">
+          <div className="panel relative flex min-h-100 flex-col overflow-hidden rounded-xl md:col-span-7 md:row-span-2 md:min-h-0">
             <div className="panel-header flex items-center justify-between px-4 py-3">
               <div>
                 <div className="text-sm font-semibold text-gray-100">Candlestick Chart</div>
@@ -396,7 +427,7 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="panel flex min-h-125 flex-col overflow-hidden rounded-xl md:col-span-5 md:row-start-1 md:min-h-0">
+          <div className="panel flex min-h-125 flex-col overflow-hidden rounded-xl md:col-span-5 md:col-start-8 md:row-start-1 md:min-h-0">
             <div className="panel-header flex items-center justify-between px-4 py-3">
               <div>
                 <div className="text-sm font-semibold text-gray-100">Order Book (Top 10)</div>
@@ -408,23 +439,12 @@ export default function Home() {
             </div>
           </div>
 
-          <div className="panel flex min-h-55 flex-col overflow-hidden rounded-xl md:col-span-6 md:row-start-2 md:min-h-0">
+          <div className="panel flex min-h-55 flex-col overflow-hidden rounded-xl md:col-span-5 md:col-start-8 md:row-start-2 md:min-h-0">
             <div className="panel-header px-4 py-3">
               <div className="text-sm font-semibold text-gray-100">Recent Trades</div>
             </div>
             <div className="flex-1 overflow-hidden">
               <Trades />
-            </div>
-          </div>
-
-          <div className="panel flex min-h-55 flex-col overflow-hidden rounded-xl md:col-span-6 md:col-start-7 md:row-start-2 md:min-h-0">
-            <div className="panel-header flex items-center justify-between px-4 py-3">
-              <div>
-                <div className="text-sm font-semibold text-gray-100">Connection &amp; Delivery Details</div>
-              </div>
-            </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">
-              <DebugPanel />
             </div>
           </div>
 

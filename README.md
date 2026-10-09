@@ -34,3 +34,26 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
 
 Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+
+## Backend
+
+The `backend/` directory contains the Node.js, Express, and WebSocket server
+used by the dashboard.
+
+From the repository root, run:
+
+```bash
+cd backend
+npm install
+npm run dev
+```
+
+Run the frontend in a second terminal:
+
+```bash
+npm install
+npm run dev
+```
+
+The backend listens on `http://localhost:4000` and the frontend on
+`http://localhost:3000`.
